@@ -30,10 +30,24 @@
         <ul></ul>
         <select class="section-picker" aria-label="Jump to a category"></select>
       </div>
-      <button type="button" class="nav-cart" aria-haspopup="dialog" hidden>
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11h20"/><path d="m5 11 4-7"/><path d="m19 11-4-7"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="M4.5 15.5h15"/><path d="m9 11 1 9"/><path d="m15 11-1 9"/></svg>
-        <span class="nav-cart-count"></span>
-      </button>
+      <div class="nav-tools">
+        <div class="finder" role="search" hidden>
+          <button type="button" class="finder-open" aria-label="Search designs" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></svg>
+          </button>
+          <label class="finder-field">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></svg>
+            <input type="search" placeholder="Search" aria-label="Search designs" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" maxlength="100">
+            <button type="button" class="finder-clear" aria-label="Clear search" hidden><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg></button>
+          </label>
+          <button type="button" class="finder-close">Cancel</button>
+          <p class="finder-status visually-hidden" aria-live="polite"></p>
+        </div>
+        <button type="button" class="nav-cart" aria-haspopup="dialog" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11h20"/><path d="m5 11 4-7"/><path d="m19 11-4-7"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="M4.5 15.5h15"/><path d="m9 11 1 9"/><path d="m15 11-1 9"/></svg>
+          <span class="nav-cart-count"></span>
+        </button>
+      </div>
     </div>
   </nav>
 

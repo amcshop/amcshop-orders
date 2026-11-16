@@ -38,10 +38,10 @@ Registered with `ShopPage.on(name, fn)`. A hook that throws is logged to the con
 
 | Name | Arguments | When |
 |---|---|---|
-| `card` | `(el, product)` | After each product card is built, before it's added to the page. A New product has two cards. |
+| `card` | `(el, product)` | After each product card is built, before it's added to the page. A New product has two cards. Cards are built a page at a time as the customer scrolls, and rebuilt for search results, so this can run long after `products` and more than once per card position. |
 | `line` | `(li, product)` | After each order-sheet line is built. Lines are rebuilt on every cart change while the sheet is open. |
 | `cart` | `()` | After any cart change has been rendered (including the cart being trimmed to availability or cleared after an order). |
-| `products` | `()` | After the products have been (re)loaded and the catalog rendered: on load, after an order, and on retry. |
+| `products` | `()` | After the products have been (re)loaded and the first page of the catalog rendered: on load, after an order, and on retry. Not every product has a card yet; use `product(sku)` rather than looking for cards. |
 | `closed` | `(message)` | When orders close (by settings, the `Close At` timer, or a 403 on submit). |
 
 ## Pricing

@@ -24,6 +24,30 @@ The extension API is documented in [hooks.md](../hooks.md); this is how it's wir
 
 Each category gets a slug key (`slug(category)`, or `new` for the New section). It's the section's `id` (`c-<key>`), and `data-category` on the section, its nav link and its cart group, so a shop's CSS can color a category by name (see [customizing.md](../customizing.md#colors-and-design)). The automatic tint is set inline as `--auto-tint`, never as `--tint`: an inline `--tint` would beat any stylesheet rule.
 
+## Paging (`feed`, `startFeed`, `renderMore`, `fillFold`, `watchFeed`, `revealSection`)
+
+The catalog isn't rendered all at once. `feed.items` is the flat list of (group, product) cards in page order (New first, then each category); sections are created as their first card is reached.
+
+- `fillFold` renders `FOLD_STEP` cards at a time until the last one is below the bottom of the screen, then `PAGE_SIZE` (20) more.
+- `watchFeed` watches the card `LOAD_AHEAD` (10) from the end of what's rendered; when it comes within a quarter screen of view, `renderMore(PAGE_SIZE)` adds the next 20. Without `IntersectionObserver` everything is rendered.
+- `revealSection(id)` renders everything up to a section plus a page, so the nav tapes, the picker and a `#c-…` link on load can scroll to a section that wasn't rendered yet. The tape's click handler calls it before the browser follows the hash. Picking a category while searching clears the search first.
+- `updateProduct` only touches cards that exist; a card rendered later is built from the current cart and stock.
+- `watchSections` takes the section ids in order and is handed each section as it's created (`sectionObserver.observe` in `feedSection`).
+
+## Search (`search`, `tokenScore`, `typos`, `applySearch`)
+
+Front end only, over name, category and description (weights 3, 2, 1). Text is folded (lowercase, accents removed) and split into words. Every query word must match one of the fields:
+
+- a word starting with it (an exact word scores a little more), else
+- a substring anywhere (2+ letters), else
+- a typo match against a word or the word's prefix of the same length (so a half-typed word with a typo still matches): 1 typo from 4 letters, 2 from 8, counting a swap of two neighbours as one (`typos` is an optimal string alignment distance that gives up past the limit).
+
+Results are sorted by score, then catalog order, and shown as one "Search results" section through the same feed, with categories shown on the cards; the New duplicates aren't repeated. The query's words are highlighted on each result card with `<mark>` (`markMatches`/`matchRanges`, the same rules per word; a typo match marks the whole word). `matchRanges` maps positions in the folded text back to the original, so accented letters are marked whole.
+
+Input is debounced by `SEARCH_DELAY`; Enter searches now and closes the keyboard, Escape clears. `.finder-clear` (the × inside the field) shows while there's text and clears the search, keeping the field open and focused. When the query changes and the catalog's top is above the screen, the page jumps to it. `.finder-status` (visually hidden, `aria-live`) announces the count. The query survives `loadShop` (after an order the results are re-run).
+
+The field lives in the nav's `.nav-tools`, before the cart button. Below 52rem only the magnifier (`.finder-open`) shows; `openFinder` adds `.finding` to the nav, which hides the logo and categories and gives the field the row, and `closeFinder` (Cancel, Escape, or leaving an empty field) clears the search and closes it.
+
 ## watchNavHeight
 
 The nav is `position: fixed`, so the page reserves `--nav-h` for it (body padding, `scroll-padding-top`). On wide screens the category bar wraps, so the bar's height varies; a `ResizeObserver` on `.tapes-row` writes its real height into `--nav-h` on `<html>`. The row's own minimum is `--nav-row`, not `--nav-h`, so the measurement can't feed back into itself. With the shop closed the nav is hidden (height 0) and the value is left alone.

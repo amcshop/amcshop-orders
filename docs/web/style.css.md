@@ -24,6 +24,16 @@ app.js sets `<html data-theme>` (and `web/theme.js` sets it early from the last 
 
 `.discounts` is the list of discount lines above the order sheet's total, filled only when an extension prices the cart (see [hooks.md](../hooks.md#pricing)); lite never shows it. `.pending` dims totals while a price is being worked out.
 
+## Nav tools and search
+
+`.nav-tools` holds the search (`.finder`) and the cart button at the right of the nav. It's `align-self: flex-start` with the height of one nav row, as is `.nav-logo`, so when many categories wrap onto several rows both stay on the top row instead of centering on the block.
+
+- From 52rem up, the search field (`.finder-field`) is always shown, 15rem wide.
+- Below 52rem only the magnifier (`.finder-open`) shows. `.tapes.finding` hides the logo and categories and lets the field and its Cancel button (`.finder-close`) take the row.
+- `.finder-clear` is the round × inside the field, shown while there's text. The browser's own search clear button is hidden everywhere (Firefox has none, so it would be inconsistent). The input has `width: 0` and grows by flex, because an input's default width would otherwise push the Cancel button under the cart on narrow phones.
+- The input is 16px so iOS doesn't zoom on focus.
+- `mark` (search matches on result cards) is a 40% `--brand` tint behind inherited text, so it reads in every theme.
+
 ## Default theme sections
 
 - **Masthead**: left-aligned; the shop name is the one loud thing.

@@ -11,6 +11,10 @@ const TAPE_TINTS = 6;
 const PRICING_DELAY = 150;
 const THEMES = ["default", "art-crafts", "dark"];
 const THEME_KEY = "theme-v1:" + location.pathname;
+const PAGE_SIZE = 20;
+const LOAD_AHEAD = 10;
+const FOLD_STEP = 4;
+const SEARCH_DELAY = 150;
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -20,6 +24,8 @@ const state = {
   bySku: new Map(),
   cart: new Map(),
   tints: new Map(),
+  groups: [],
+  query: "",
 };
 
 const shop = $("#shop");
@@ -28,6 +34,10 @@ const picker = $(".section-picker", nav);
 const cartbar = $(".cartbar");
 const orderDialog = $("#order");
 const form = $("#order-form");
+const finder = $(".finder");
+const finderInput = $("input", finder);
+const finderClear = $(".finder-clear", finder);
+let searchTimer = 0;
 
 async function request(url, init) {
   const res = await fetch(url, init);
@@ -230,33 +240,33 @@ function stepper(sku, qty, limit, label) {
   return el;
 }
 
-function renderShop() {
+function catalogGroups() {
   const groups = [];
   const fresh = state.products.filter((p) => p.new);
-  if (fresh.length) groups.push({ id: "new", key: "new", name: "New", products: fresh, tint: "var(--tape-new)" });
+  if (fresh.length) groups.push({ id: "new", key: "new", name: "New", products: fresh, tint: "var(--tape-new)", mixed: true });
   const categories = new Map();
   state.tints.clear();
   for (const p of state.products) {
     if (!categories.has(p.category)) {
       const tint = `var(--tape-${(categories.size % TAPE_TINTS) + 1})`;
       const key = slug(p.category || "other");
-      const group = { id: "c-" + key, key, name: p.category || "Other", products: [], tint };
+      const group = { id: "c-" + key, key, name: p.category || "Other", products: [], tint, mixed: false };
       categories.set(p.category, group);
       groups.push(group);
       state.tints.set(p.category, tint);
     }
     categories.get(p.category).products.push(p);
   }
+  return groups;
+}
 
+function renderNav(groups) {
   const navList = $("ul", nav);
   navList.replaceChildren();
   const placeholder = new Option("Jump to a category", "");
   placeholder.disabled = true;
   picker.replaceChildren(placeholder);
-  const sections = [];
-  for (const { id, key, name, products, tint } of groups) {
-    const mixed = id === "new";
-
+  for (const { id, key, name, tint } of groups) {
     const link = document.createElement("a");
     link.className = "tape";
     link.href = "#" + id;
@@ -267,38 +277,297 @@ function renderShop() {
     li.append(link);
     navList.append(li);
     picker.append(new Option(name, id));
-
-    const section = document.createElement("section");
-    section.className = "category";
-    section.id = id;
-    section.dataset.category = key;
-    section.style.setProperty("--auto-tint", tint);
-    section.setAttribute("aria-labelledby", id + "-h");
-    const head = document.createElement("div");
-    head.className = "category-head";
-    const h2 = document.createElement("h2");
-    h2.id = id + "-h";
-    h2.textContent = name;
-    const count = document.createElement("p");
-    count.textContent = plural(products.length, "design", "designs");
-    head.append(h2, count);
-
-    const grid = document.createElement("ul");
-    grid.className = "grid";
-    for (const p of products) grid.append(productCard(p, mixed));
-    section.append(head, grid);
-    sections.push(section);
   }
+}
 
-  if (!sections.length) {
+function renderShop() {
+  state.groups = catalogGroups();
+  renderNav(state.groups);
+  finder.hidden = !state.products.length;
+  if (state.query) {
+    showResults();
+  } else {
+    startFeed(state.groups, "No products yet. Check back soon!");
+  }
+  shop.removeAttribute("aria-busy");
+}
+
+const feed = { groups: [], items: [], next: 0, grids: new Map(), cards: [], observer: null };
+
+function startFeed(groups, emptyMessage, emptyAction) {
+  feed.observer?.disconnect();
+  feed.observer = null;
+  feed.groups = groups;
+  feed.items = groups.flatMap((group) => group.products.map((product) => ({ group, product })));
+  feed.next = 0;
+  feed.grids = new Map();
+  feed.cards = [];
+  shop.replaceChildren();
+  watchSections(groups.map((g) => g.id));
+  if (!feed.items.length) {
     const empty = document.createElement("p");
     empty.className = "status";
-    empty.textContent = "No products yet. Check back soon!";
-    sections.push(empty);
+    empty.textContent = emptyMessage;
+    if (emptyAction) empty.append(" ", emptyAction);
+    shop.append(empty);
+    return;
   }
-  shop.replaceChildren(...sections);
-  shop.removeAttribute("aria-busy");
-  watchSections(sections.filter((s) => s.id));
+  fillFold();
+}
+
+function feedSection(group) {
+  let grid = feed.grids.get(group.id);
+  if (grid) return grid;
+  const section = document.createElement("section");
+  section.className = "category";
+  section.id = group.id;
+  section.dataset.category = group.key;
+  section.style.setProperty("--auto-tint", group.tint);
+  section.setAttribute("aria-labelledby", group.id + "-h");
+  const head = document.createElement("div");
+  head.className = "category-head";
+  const h2 = document.createElement("h2");
+  h2.id = group.id + "-h";
+  h2.textContent = group.name;
+  const count = document.createElement("p");
+  count.textContent = plural(group.products.length, "design", "designs");
+  head.append(h2, count);
+  grid = document.createElement("ul");
+  grid.className = "grid";
+  section.append(head, grid);
+  shop.append(section);
+  sectionObserver?.observe(section);
+  feed.grids.set(group.id, grid);
+  return grid;
+}
+
+function renderMore(n) {
+  const end = Math.min(feed.next + n, feed.items.length);
+  for (; feed.next < end; feed.next++) {
+    const { group, product } = feed.items[feed.next];
+    const card = productCard(product, group.mixed);
+    feedSection(group).append(card);
+    feed.cards.push(card);
+  }
+  watchFeed();
+}
+
+function fillFold() {
+  renderMore(FOLD_STEP);
+  while (feed.next < feed.items.length) {
+    const r = feed.cards[feed.cards.length - 1].getBoundingClientRect();
+    if (!r.height || r.top >= window.innerHeight) break;
+    renderMore(FOLD_STEP);
+  }
+  renderMore(PAGE_SIZE);
+}
+
+function watchFeed() {
+  if (feed.next >= feed.items.length) {
+    feed.observer?.disconnect();
+    return;
+  }
+  if (!("IntersectionObserver" in window)) {
+    renderMore(feed.items.length);
+    return;
+  }
+  feed.observer ??= new IntersectionObserver((entries) => {
+    if (entries.some((e) => e.isIntersecting || e.boundingClientRect.top < 0)) renderMore(PAGE_SIZE);
+  }, { rootMargin: "0px 0px 25% 0px" });
+  feed.observer.disconnect();
+  feed.observer.observe(feed.cards[Math.max(0, feed.cards.length - LOAD_AHEAD)]);
+}
+
+function revealSection(id) {
+  if (state.query && state.groups.some((g) => g.id === id)) clearSearch();
+  const i = feed.items.findIndex((it) => it.group.id === id);
+  if (i >= feed.next) renderMore(i - feed.next + PAGE_SIZE);
+  return document.getElementById(id);
+}
+
+function fold(s) {
+  return String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+function words(s) {
+  return fold(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+function typos(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev2 = null;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let d = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + cost);
+      if (prev2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d = Math.min(d, prev2[j - 2] + 1);
+      row.push(d);
+      best = Math.min(best, d);
+    }
+    if (best > max) return max + 1;
+    prev2 = prev;
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+const searchIndex = new WeakMap();
+
+function searchFields(p) {
+  let fields = searchIndex.get(p);
+  if (!fields) {
+    fields = [
+      [p.name, 3],
+      [p.category, 2],
+      [p.description, 1],
+    ].map(([text, weight]) => ({ text: fold(text), words: words(text), weight }));
+    searchIndex.set(p, fields);
+  }
+  return fields;
+}
+
+function typoLimit(token) {
+  return token.length >= 8 ? 2 : token.length >= 4 ? 1 : 0;
+}
+
+function wordTypos(token, word, max) {
+  return Math.min(typos(token, word, max), typos(token, word.slice(0, token.length), max));
+}
+
+function tokenScore(token, field) {
+  if (field.words.some((w) => w.startsWith(token))) return field.words.includes(token) ? 1.2 : 1;
+  if (token.length > 1 && field.text.includes(token)) return 0.7;
+  const max = typoLimit(token);
+  if (!max) return 0;
+  let best = max + 1;
+  for (const w of field.words) {
+    best = Math.min(best, wordTypos(token, w, max));
+    if (best === 1) break;
+  }
+  return best <= max ? 0.6 - 0.15 * (best - 1) : 0;
+}
+
+function matchRanges(text, tokens) {
+  let folded = "";
+  const from = [];
+  let at = 0;
+  for (const ch of text) {
+    const f = fold(ch);
+    for (let k = 0; k < f.length; k++) from.push(at);
+    folded += f;
+    at += ch.length;
+  }
+  from.push(text.length);
+  const ranges = [];
+  for (const m of folded.matchAll(/[\p{L}\p{N}]+/gu)) {
+    const w = m[0];
+    for (const t of tokens) {
+      let start = -1;
+      let len = t.length;
+      if (w.startsWith(t)) start = 0;
+      else if (t.length > 1 && w.includes(t)) start = w.indexOf(t);
+      else if (typoLimit(t) && wordTypos(t, w, typoLimit(t)) <= typoLimit(t)) [start, len] = [0, w.length];
+      if (start >= 0) ranges.push([from[m.index + start], from[m.index + start + len]]);
+    }
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push(r);
+  }
+  return merged;
+}
+
+function markMatches(el, tokens) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    const ranges = matchRanges(node.data, tokens);
+    if (!ranges.length) continue;
+    const parts = [];
+    let at = 0;
+    for (const [start, end] of ranges) {
+      if (start > at) parts.push(node.data.slice(at, start));
+      const mark = document.createElement("mark");
+      mark.textContent = node.data.slice(start, end);
+      parts.push(mark);
+      at = end;
+    }
+    if (at < node.data.length) parts.push(node.data.slice(at));
+    node.replaceWith(...parts);
+  }
+}
+
+function search(query) {
+  const tokens = words(query);
+  if (!tokens.length) return [];
+  const hits = [];
+  state.products.forEach((p, i) => {
+    const fields = searchFields(p);
+    let score = 0;
+    for (const t of tokens) {
+      const s = Math.max(...fields.map((f) => tokenScore(t, f) * f.weight));
+      if (!s) return;
+      score += s;
+    }
+    hits.push({ p, i, score });
+  });
+  hits.sort((a, b) => b.score - a.score || a.i - b.i);
+  return hits.map((h) => h.p);
+}
+
+function showResults() {
+  const results = search(state.query);
+  const group = { id: "results", key: "results", name: "Search results", products: results, tint: "var(--brand)", mixed: true };
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.textContent = "Clear search";
+  clear.addEventListener("click", () => {
+    clearSearch();
+    finderInput.focus();
+  });
+  startFeed([group], `No designs match \u201c${state.query.trim()}\u201d.`, clear);
+  $(".finder-status", finder).textContent = results.length
+    ? `${plural(results.length, "design", "designs")} found`
+    : "No designs found";
+}
+
+function applySearch() {
+  clearTimeout(searchTimer);
+  const query = words(finderInput.value).length ? finderInput.value : "";
+  if (query === state.query) return;
+  state.query = query;
+  if (!query) {
+    $(".finder-status", finder).textContent = "";
+    startFeed(state.groups, "No products yet. Check back soon!");
+  } else {
+    showResults();
+  }
+  if (shop.getBoundingClientRect().top < 0) shop.scrollIntoView({ behavior: "instant" });
+}
+
+function clearSearch() {
+  finderInput.value = "";
+  finderClear.hidden = true;
+  applySearch();
+}
+
+function openFinder() {
+  nav.classList.add("finding");
+  $(".finder-open", finder).setAttribute("aria-expanded", "true");
+  finderInput.focus();
+}
+
+function closeFinder() {
+  nav.classList.remove("finding");
+  $(".finder-open", finder).setAttribute("aria-expanded", "false");
+  if (finderInput.value) clearSearch();
 }
 
 function productCard(p, showCategory = false) {
@@ -321,6 +590,11 @@ function productCard(p, showCategory = false) {
 
   $(".product-name .name", el).textContent = p.name;
   fillSubline($(".product-desc", el), showCategory ? p.category : "", p.description);
+  if (state.query) {
+    const tokens = words(state.query);
+    markMatches($(".product-name .name", el), tokens);
+    markMatches($(".product-desc", el), tokens);
+  }
   $(".price", el).textContent = peso(p.price);
   fillProduct(el, p);
   emit("card", el, p);
@@ -432,22 +706,23 @@ function watchMasthead() {
 
 let sectionObserver = null;
 
-function watchSections(sections) {
+function watchSections(ids) {
   sectionObserver?.disconnect();
+  sectionObserver = null;
   if (!("IntersectionObserver" in window)) return;
   const list = $("ul", nav);
   const links = new Map($$(".tape", nav).map((a) => [a.hash.slice(1), a]));
   const visible = new Set();
-  let currentId = null;
+  let currentId;
   sectionObserver = new IntersectionObserver((entries) => {
     for (const e of entries) {
       if (e.isIntersecting) visible.add(e.target.id);
       else visible.delete(e.target.id);
     }
-    const id = sections.find((s) => visible.has(s.id))?.id ?? null;
+    const id = ids.find((s) => visible.has(s)) ?? null;
     if (id === currentId) return;
     currentId = id;
-    picker.value = id ?? "";
+    picker.value = links.has(id) ? id : "";
     for (const [linkId, a] of links) {
       if (linkId === id) a.setAttribute("aria-current", "true");
       else a.removeAttribute("aria-current");
@@ -459,7 +734,6 @@ function watchSections(sections) {
       if (r.left < lr.left || r.right > lr.right) list.scrollBy({ left: r.left - lr.left - 16, behavior: "smooth" });
     }
   }, { rootMargin: "-30% 0px -60% 0px" });
-  sections.forEach((s) => sectionObserver.observe(s));
 }
 
 function renderLines(flagged = new Set()) {
@@ -789,10 +1063,12 @@ async function loadShop() {
     return;
   }
   applySettings(data.settings);
+  const first = !state.products.length;
   state.products = data.products;
   state.bySku = new Map(data.products.map((p) => [p.sku, p]));
   reconcileCart();
   renderShop();
+  if (first && location.hash.length > 1) revealSection(location.hash.slice(1))?.scrollIntoView();
   pricing.quote = null;
   updateCartbar();
   emit("products");
@@ -828,7 +1104,47 @@ $(".nav-logo").addEventListener("click", (e) => {
 });
 
 picker.addEventListener("change", () => {
-  document.getElementById(picker.value)?.scrollIntoView();
+  revealSection(picker.value)?.scrollIntoView();
+});
+
+$("ul", nav).addEventListener("click", (e) => {
+  const tape = e.target.closest(".tape");
+  if (tape) revealSection(tape.hash.slice(1));
+});
+
+finderInput.addEventListener("input", () => {
+  finderClear.hidden = !finderInput.value;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(applySearch, SEARCH_DELAY);
+});
+finderInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    applySearch();
+    finderInput.blur();
+  } else if (e.key === "Escape" && (finderInput.value || nav.classList.contains("finding"))) {
+    e.preventDefault();
+    if (nav.classList.contains("finding")) {
+      closeFinder();
+      $(".finder-open", finder).focus();
+    } else {
+      clearSearch();
+    }
+  }
+});
+finderInput.addEventListener("search", applySearch);
+finderInput.addEventListener("blur", () => {
+  if (!finderInput.value) setTimeout(() => {
+    if (!finder.contains(document.activeElement)) closeFinder();
+  }, 0);
+});
+$(".finder-open", finder).addEventListener("click", openFinder);
+finderClear.addEventListener("click", () => {
+  clearSearch();
+  finderInput.focus();
+});
+$(".finder-close", finder).addEventListener("click", () => {
+  closeFinder();
+  $(".finder-open", finder).focus();
 });
 
 $(".cartbar-button").addEventListener("click", openOrder);
