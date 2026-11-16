@@ -57,7 +57,7 @@ Request:
 | 429 | `{error}` | Rate limited (lite: over 20 orders/minute shop-wide; pro: per IP) |
 | 503 | `{error}` | The sheet couldn't be read or written |
 
-The server re-validates everything and prices items from the sheet, never from the client. Validation rules: name 1–100 chars, no control characters; `contactVia` must be one of the shop's Contact Fields; then an email, a Facebook username/ID (`[A-Za-z0-9.]{1,50}`) or a facebook.com / fb.com / m.me / messenger.com link (stored as `https://…`, at most 200 chars), or an Instagram username (`[A-Za-z0-9._]{1,30}`), with a leading `@` dropped from usernames; Philippine mobile (`09…`, `9…`, `639…`, `+639…`, stored as `09XXXXXXXXX`); 1–50 distinct products, 1–99 of each (duplicates merged).
+The server re-validates everything and prices items from the sheet, never from the client. Validation rules: name 1–100 chars, no control characters; `contactVia` must be one of the shop's Contact Fields; then an email (without `? & # % = / \`, which would add parameters to the owner's mailto: link), a Facebook username/ID (`[A-Za-z0-9.]{1,50}`) or a facebook.com / fb.com / m.me / messenger.com link (stored as `https://<host><path>`, at most 200 chars; the query string is dropped, except a `profile.php` link keeps its numeric `id`), or an Instagram username (`[A-Za-z0-9._]{1,30}`), with a leading `@` dropped from usernames; Philippine mobile (`09…`, `9…`, `639…`, `+639…`, stored as `09XXXXXXXXX`); 1–50 distinct products, 1–99 of each, checked both per entry and after duplicates are merged.
 
 ## Pro-only extensions (not in lite)
 

@@ -39,12 +39,16 @@ const ORDERS_PER_MINUTE = 20;
 
 const DEFAULT_CLOSED = "Pre-orders are closed. Thank you!";
 
-const EMAIL_RE = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/;
+// Also refuses ? & # % = / \, which are legal in an address but would add parameters
+// (cc, bcc, body) to the owner's mailto: link in ORDERS.
+const EMAIL_RE = /^[^\s@<>()",;:?&#%=\/\\]+@[^\s@<>()",;:?&#%=\/\\]+\.[^\s@<>()",;:?&#%=\/\\]+$/;
 const INSTAGRAM_RE = /^[A-Za-z0-9._]{1,30}$/;
 // A Facebook username or numeric ID (opened as m.me/<it>), or a link to a profile on these hosts
 // (kept as an https:// link, because "Copy link" in the Facebook app gives facebook.com/share/… links).
+// The query string is dropped (see parseMessenger), so a link can't carry a redirect target.
 const MESSENGER_USER_RE = /^[A-Za-z0-9.]{1,50}$/;
-const MESSENGER_URL_RE = /^(?:https?:\/\/)?(?:(?:www|m|web)\.)?(facebook\.com|fb\.com|m\.me|messenger\.com)(\/[A-Za-z0-9._~\-\/?=&%]+)$/i;
+const MESSENGER_URL_RE = /^(?:https?:\/\/)?(?:(?:www|m|web)\.)?(facebook\.com|fb\.com|m\.me|messenger\.com)(\/[A-Za-z0-9._~\-\/%]+)(?:\?([A-Za-z0-9._~\-=&%]*))?$/i;
+const MESSENGER_ID_RE = /(?:^|&)id=(\d{1,20})(?:&|$)/;
 const MAX_MESSENGER = 200;
 // 09XXXXXXXXX, 9XXXXXXXXX, 639XXXXXXXXX or +639XXXXXXXXX (Philippine mobiles).
 const MOBILE_RE = /^(?:\+?63|0)?(9\d{9})$/;
@@ -210,6 +214,7 @@ function normalize(b, methods) {
     if (!sku || !Number.isInteger(qty) || qty < 1) {
       return bad("items", "Each item needs a product and a quantity of at least 1.");
     }
+    if (qty > MAX_LINE_QTY) return bad("items", `At most ${MAX_LINE_QTY} of each product per order.`);
     merged.set(sku, (merged.get(sku) || 0) + qty);
   }
   if (merged.size > MAX_LINES) return bad("items", `Too many different products in one order (max ${MAX_LINES}).`);
@@ -219,13 +224,19 @@ function normalize(b, methods) {
   return { customer: c, items: [...merged].map(([sku, quantity]) => ({ sku: sku, quantity: quantity })) };
 }
 
-/** A Facebook username/ID as typed (minus "@"), or a facebook.com / m.me link as https://…; "" if neither. */
+/**
+ * A Facebook username/ID as typed (minus "@"), or a facebook.com / m.me link as https://…; "" if neither.
+ * A link keeps only its host and path, except that a profile.php link keeps its numeric id.
+ */
 function parseMessenger(v) {
   const s = v.trim().replace(/^@/, "");
   if (MESSENGER_USER_RE.test(s)) return s;
   const m = MESSENGER_URL_RE.exec(s);
   if (!m || s.length > MAX_MESSENGER) return "";
-  return "https://" + m[1].toLowerCase() + m[2];
+  const link = "https://" + m[1].toLowerCase() + m[2];
+  if (m[2].toLowerCase() !== "/profile.php") return link;
+  const id = MESSENGER_ID_RE.exec(m[3] || "");
+  return id ? link + "?id=" + id[1] : "";
 }
 
 /** Allows ORDERS_PER_MINUTE orders per clock minute. Call while holding the lock. */
