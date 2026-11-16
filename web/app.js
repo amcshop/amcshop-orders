@@ -549,7 +549,8 @@ function applySearch() {
   } else {
     showResults();
   }
-  if (shop.getBoundingClientRect().top < 0) shop.scrollIntoView({ behavior: "instant" });
+  const top = shop.getBoundingClientRect().top;
+  if (top < 0 || top > window.innerHeight / 2) shop.scrollIntoView({ behavior: "instant" });
 }
 
 function clearSearch() {
