@@ -16,6 +16,10 @@ app.js sets `<html data-theme>` (and `web/theme.js` sets it early from the last 
 - Each theme sets its own default `--theme-brand`. A shop's `web/shop.css` may set `--brand` itself, and SETTINGS Primary Color overrides both.
 - `--on-light` is dark text for light fills, whatever the theme. Use it for text on a `--brand` fill, never `--ink` (which is light in `dark`).
 
+## Category tints
+
+`--tint` comes from `:where(.tape, .category, .line-group) { --tint: var(--auto-tint); }`. `app.js` sets `--auto-tint` inline. The `:where` gives the rule zero specificity, so a shop's `[data-category…] { --tint: … }` wins without `!important`.
+
 ## Discounts and pending
 
 `.discounts` is the list of discount lines above the order sheet's total, filled only when an extension prices the cart (see [hooks.md](../hooks.md#pricing)); lite never shows it. `.pending` dims totals while a price is being worked out.
@@ -23,7 +27,7 @@ app.js sets `<html data-theme>` (and `web/theme.js` sets it early from the last 
 ## Default theme sections
 
 - **Masthead**: left-aligned; the shop name is the one loud thing.
-- **Nav**: plain text tabs; a category's color shows as a small swatch.
+- **Nav**: plain text tabs; a category's color shows as a small swatch. From 52rem up, the tabs wrap instead of scrolling (in every theme); see [app.js.md](app.js.md#watchnavheight) for how `--nav-h` follows.
 - **Categories**.
 - **Products**: photo on a soft tile, text below with no box.
 - **Order sheet**.

@@ -37,8 +37,11 @@
 
   --gutter: 1rem;
   --measure: 72rem;
-  --nav-h: 3.5rem;
+  --nav-row: 3.5rem;
+  --nav-h: var(--nav-row);
 }
+
+:where(.tape, .category, .line-group) { --tint: var(--auto-tint); }
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -176,7 +179,7 @@ u { text-underline-offset: 0.18em; }
 .tapes-row {
   display: flex;
   align-items: center;
-  min-height: var(--nav-h);
+  min-height: var(--nav-row);
   max-width: var(--measure);
   margin: 0 auto;
   padding-left: var(--gutter);
@@ -252,6 +255,9 @@ u { text-underline-offset: 0.18em; }
   scrollbar-width: none;
 }
 .tapes ul::-webkit-scrollbar { display: none; }
+@media (min-width: 52rem) {
+  .tapes ul { flex-wrap: wrap; row-gap: 0.35rem; overflow-x: visible; }
+}
 
 .tape,
 .category-head,

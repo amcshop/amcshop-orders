@@ -20,6 +20,14 @@ The extension API is documented in [hooks.md](../hooks.md); this is how it's wir
 - `setPricing` re-renders the totals only once products are loaded: `cartTotals` needs every cart SKU's price, and a cart restored from `localStorage` can name products that haven't loaded yet.
 - `loadScripts` appends each `SHOP_CONFIG.scripts` file as a non-async `<script>` (so they run in order) and resolves when all have loaded or failed. `loadShop` awaits it (`scriptsLoaded`) alongside the data, so hooks are in place before the first render. Only bare filenames are accepted: the scripts must come from the page's own origin.
 
+## Categories (`renderShop`, `renderLines`)
+
+Each category gets a slug key (`slug(category)`, or `new` for the New section). It's the section's `id` (`c-<key>`), and `data-category` on the section, its nav link and its cart group, so a shop's CSS can color a category by name (see [customizing.md](../customizing.md#colors-and-design)). The automatic tint is set inline as `--auto-tint`, never as `--tint`: an inline `--tint` would beat any stylesheet rule.
+
+## watchNavHeight
+
+The nav is `position: fixed`, so the page reserves `--nav-h` for it (body padding, `scroll-padding-top`). On wide screens the category bar wraps, so the bar's height varies; a `ResizeObserver` on `.tapes-row` writes its real height into `--nav-h` on `<html>`. The row's own minimum is `--nav-row`, not `--nav-h`, so the measurement can't feed back into itself. With the shop closed the nav is hidden (height 0) and the value is left alone.
+
 ## HANDLE_LINK
 
 The shop's own links under the notes: maps a SETTINGS handle kind to `[href, text]` for its value. A Messenger value that's already an `https://` URL is linked as is; otherwise it's treated as a page name for `m.me`.

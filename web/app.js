@@ -233,13 +233,14 @@ function stepper(sku, qty, limit, label) {
 function renderShop() {
   const groups = [];
   const fresh = state.products.filter((p) => p.new);
-  if (fresh.length) groups.push({ id: "new", name: "New", products: fresh, tint: "var(--tape-new)" });
+  if (fresh.length) groups.push({ id: "new", key: "new", name: "New", products: fresh, tint: "var(--tape-new)" });
   const categories = new Map();
   state.tints.clear();
   for (const p of state.products) {
     if (!categories.has(p.category)) {
       const tint = `var(--tape-${(categories.size % TAPE_TINTS) + 1})`;
-      const group = { id: "c-" + slug(p.category || "other"), name: p.category || "Other", products: [], tint };
+      const key = slug(p.category || "other");
+      const group = { id: "c-" + key, key, name: p.category || "Other", products: [], tint };
       categories.set(p.category, group);
       groups.push(group);
       state.tints.set(p.category, tint);
@@ -253,14 +254,15 @@ function renderShop() {
   placeholder.disabled = true;
   picker.replaceChildren(placeholder);
   const sections = [];
-  for (const { id, name, products, tint } of groups) {
+  for (const { id, key, name, products, tint } of groups) {
     const mixed = id === "new";
 
     const link = document.createElement("a");
     link.className = "tape";
     link.href = "#" + id;
     link.textContent = name;
-    link.style.setProperty("--tint", tint);
+    link.dataset.category = key;
+    link.style.setProperty("--auto-tint", tint);
     const li = document.createElement("li");
     li.append(link);
     navList.append(li);
@@ -269,7 +271,8 @@ function renderShop() {
     const section = document.createElement("section");
     section.className = "category";
     section.id = id;
-    section.style.setProperty("--tint", tint);
+    section.dataset.category = key;
+    section.style.setProperty("--auto-tint", tint);
     section.setAttribute("aria-labelledby", id + "-h");
     const head = document.createElement("div");
     head.className = "category-head";
@@ -410,6 +413,14 @@ function watchCartbar() {
   addEventListener("resize", placeCartbar);
 }
 
+function watchNavHeight() {
+  if (!("ResizeObserver" in window)) return;
+  const row = $(".tapes-row", nav);
+  new ResizeObserver(() => {
+    if (row.offsetHeight) document.documentElement.style.setProperty("--nav-h", `${row.offsetHeight}px`);
+  }).observe(row);
+}
+
 function watchMasthead() {
   if (!("IntersectionObserver" in window)) return;
   const io = new IntersectionObserver(
@@ -462,7 +473,8 @@ function renderLines(flagged = new Set()) {
   const sections = [...groups].map(([category, ul]) => {
     const section = document.createElement("section");
     section.className = "line-group";
-    section.style.setProperty("--tint", state.tints.get(category) || "var(--brand)");
+    section.dataset.category = slug(category || "other");
+    section.style.setProperty("--auto-tint", state.tints.get(category) || "var(--brand)");
     const h3 = document.createElement("h3");
     h3.className = "line-group-title";
     h3.textContent = category || "Other";
@@ -887,6 +899,7 @@ const scriptsLoaded = loadScripts();
 
 loadCart();
 applyContactFields();
+watchNavHeight();
 watchMasthead();
 watchCartbar();
 loadShop();
