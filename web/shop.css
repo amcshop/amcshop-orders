@@ -1,0 +1,4 @@
+:root {
+  --brand: #ed7b2c;
+  --on-brand: var(--on-light);
+}

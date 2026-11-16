@@ -1,4 +1,4 @@
 window.SHOP_CONFIG = {
   backend: "apps-script",
-  api: "PASTE_YOUR_WEB_APP_URL_HERE",
+  api: "https://script.google.com/macros/s/AKfycbzajgQE0k2jdK-GamhmKhNod-JAIlhbFr2BjwqdnJaPhPF-xMh0soJx8Ms8hrTjjHqt/exec",
 };
