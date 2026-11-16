@@ -15,6 +15,8 @@ This shop's own facts. Common notes are in `CLAUDE.md` and `LITE.md`.
 
 - Logo: `web/logo.webp` (masthead, 560px, background removed, emblem interior kept white), `web/emblem.webp` (emblem only, top bar), `web/favicon.png`, `web/apple-touch-icon.png`. Source: owner's 1408×768 JPEG on white.
 - Brand colors from the logo: orange `#ed7b2c` (set as `--brand` in `web/shop.css`, dark text on it), teal `#2c5a60` (the wordmark).
+- Category colors follow the card color at the end of the category name (`OP10 - Red` → red): `--op-*` and `[data-category$="-red"]`-style rules in `web/shop.css` (the starter's `data-category` hook, see `docs/customizing.md`). A new card color needs a new rule there.
+- The category bar wraps on desktop (starter behavior from 52rem up); with 26 categories that's about 4 rows at 1280px.
 - Theme: `default`. The wordmark is dark teal, so the `dark` theme would need a light version of the logo.
 
 ## Catalog

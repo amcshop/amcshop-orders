@@ -1,4 +1,19 @@
 :root {
   --brand: #ed7b2c;
   --on-brand: var(--on-light);
+  --op-red: #d7332e;
+  --op-green: #2e9a52;
+  --op-blue: #2a6cc4;
+  --op-purple: #7f4bc0;
+  --op-black: #2f2f33;
+  --op-yellow: #e9bb1d;
 }
+
+:root[data-theme="dark"] { --op-black: #8b8b93; }
+
+[data-category$="-red"] { --tint: var(--op-red); }
+[data-category$="-green"] { --tint: var(--op-green); }
+[data-category$="-blue"] { --tint: var(--op-blue); }
+[data-category$="-purple"] { --tint: var(--op-purple); }
+[data-category$="-black"] { --tint: var(--op-black); }
+[data-category$="-yellow"] { --tint: var(--op-yellow); }
